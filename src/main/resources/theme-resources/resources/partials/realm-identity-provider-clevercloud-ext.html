@@ -1,0 +1,19 @@
+<fieldset>
+    <legend uncollapsed><span class="text">{{:: 'openid-connect-config' | translate}}</span> <kc-tooltip>{{:: 'openid-connect-config.tooltip' | translate}}</kc-tooltip></legend>
+    <div class="form-group clearfix">
+        <label class="col-md-2 control-label" for="apiKey">{{:: 'apiKey' | translate}}</label>
+        <div class="col-md-6">
+            <input class="form-control" id="apiKey" type="text" ng-model="identityProvider.config.apiKey">
+        </div>
+        <kc-tooltip>{{:: 'apiKey.tooltip' | translate}}</kc-tooltip>
+    </div>
+
+    <div class="form-group clearfix">
+        <label class="col-md-2 control-label" for="apiSecret">{{:: 'apiSecret' | translate}}</label>
+        <div class="col-md-6">
+            <input class="form-control" id="apiSecret" type="text" ng-model="identityProvider.config.apiSecret">
+        </div>
+        <kc-tooltip>{{:: 'apiSecret.tooltip' | translate}}</kc-tooltip>
+    </div>
+
+</fieldset>
