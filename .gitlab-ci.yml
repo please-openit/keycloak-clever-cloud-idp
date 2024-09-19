@@ -30,7 +30,7 @@ deploy:tag:
     - "mvn install -B"
     artifacts:
         paths:
-        - ./deployment/*.jar
+        - ./deployments/*.jar
     
 build-job:
     stage: build
