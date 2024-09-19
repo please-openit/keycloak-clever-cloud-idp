@@ -19,7 +19,7 @@
 image: jelastic/maven:3.9.5-openjdk-21
 
 variables:
-  RELEASE_BINARY: "please-open.it-clever-cloud-idp-${CI_COMMIT_TAG}-SNAPSHOT.jar"
+  RELEASE_BINARY: "please-open.it-clever-cloud-idp-${CI_COMMIT_TAG}-SNAPSHOT-jar-with-dependencies.jar"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_COMMIT_TAG}/"
 
 
@@ -61,7 +61,7 @@ deploy:tag:
     - "mvn install -B"
     artifacts:
         paths:
-        - ./deployments/*.jar
+        - ./deployments/
 
 build-job:
     stage: build
