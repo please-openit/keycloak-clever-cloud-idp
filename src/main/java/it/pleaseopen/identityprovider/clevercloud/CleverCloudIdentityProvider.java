@@ -189,7 +189,7 @@ public class CleverCloudIdentityProvider extends AbstractIdentityProvider<Clever
 
       try {
         if (denied != null) {
-          return callback.error("Cancelled");
+          return callback.error( this.provider.session.identityProviders().getById("clevercloud"),"Cancelled");
         }
         final OAuth10aService service = new ServiceBuilder(provider.getConfig().getConfig().get("clientId"))
                 .apiSecret(provider.getConfig().getConfig().get("clientSecret"))
