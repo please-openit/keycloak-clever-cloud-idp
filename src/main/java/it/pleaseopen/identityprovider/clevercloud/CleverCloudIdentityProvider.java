@@ -202,7 +202,7 @@ public class CleverCloudIdentityProvider extends AbstractIdentityProvider<Clever
         service.signRequest(accessToken, request2);
         try (com.github.scribejava.core.model.Response response = service.execute(request2)) {
           Map<String, String> mapping = new ObjectMapper().readValue(response.getBody(), HashMap.class);
-          BrokeredIdentityContext identity = new BrokeredIdentityContext("clevercloud", provider.getConfig()  );
+          BrokeredIdentityContext identity = new BrokeredIdentityContext(mapping.get("id"), provider.getConfig() );
           //identity.setIdpConfig(provider.getConfig());
           identity.setAuthenticationSession(authSession);
           identity.setIdp(provider);
