@@ -1,7 +1,6 @@
 package it.pleaseopen.identityprovider.clevercloud;
 import org.keycloak.broker.provider.AbstractIdentityProviderFactory;
 import org.keycloak.broker.provider.IdentityProviderFactory;
-import org.keycloak.broker.social.SocialIdentityProviderFactory;
 import org.keycloak.models.IdentityProviderModel;
 import org.keycloak.models.KeycloakSession;
 
