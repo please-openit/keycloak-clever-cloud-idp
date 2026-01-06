@@ -1,19 +1,11 @@
 package it.pleaseopen.identityprovider.clevercloud;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.scribejava.core.builder.ServiceBuilder;
-import com.github.scribejava.core.model.OAuth1AccessToken;
-import com.github.scribejava.core.model.OAuth1RequestToken;
-import com.github.scribejava.core.model.OAuthRequest;
-import com.github.scribejava.core.model.Verb;
-import com.github.scribejava.core.oauth.OAuth10aService;
-
-import java.io.ByteArrayInputStream;
-import java.io.ObjectInputStream;
+import it.pleaseopen.identityprovider.clevercloud.OAuth1Helper.AccessToken;
+import it.pleaseopen.identityprovider.clevercloud.OAuth1Helper.RequestToken;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.MultivaluedMap;
@@ -37,8 +29,6 @@ import org.keycloak.services.managers.ClientSessionCode;
 import org.keycloak.services.messages.Messages;
 import org.keycloak.sessions.AuthenticationSessionModel;
 
-
-import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -65,23 +55,24 @@ public class CleverCloudIdentityProvider extends AbstractIdentityProvider<Clever
   @Override
   public Response performLogin(AuthenticationRequest request) {
     try {
-      final OAuth10aService service = new ServiceBuilder(getConfig().getConfig().get("clientId"))
-              .apiSecret(getConfig().getConfig().get("clientSecret"))
-              .callback(request.getRedirectUri() + "?state=" + request.getState().getEncoded())
-              .build(CleverCloudApi.instance());
+      String clientId = getConfig().getConfig().get("clientId");
+      String clientSecret = getConfig().getConfig().get("clientSecret");
+      String callbackUrl = request.getRedirectUri() + "?state=" + request.getState().getEncoded();
+      
+      OAuth1Helper oauthHelper = new OAuth1Helper(clientId, clientSecret);
 
       AuthenticationSessionModel authSession = request.getAuthenticationSession();
-      authSession.setAuthNote("redirect", request.getRedirectUri() + "?state=" + request.getState().getEncoded());
+      authSession.setAuthNote("redirect", callbackUrl);
 
-      final OAuth1RequestToken requestToken = service.getRequestToken();
+      final RequestToken requestToken = oauthHelper.getRequestToken(CleverCloudApi.REQUEST_TOKEN_URL, callbackUrl);
       authSession.setAuthNote(CLEVER_CLOUD_TOKEN, requestToken.getToken());
       authSession.setAuthNote(CLEVER_CLOUD_TOKENSECRET, requestToken.getTokenSecret());
 
-      URI authenticationUrl = URI.create(service.getAuthorizationUrl(requestToken));
+      URI authenticationUrl = URI.create(CleverCloudApi.AUTHORIZE_URL + "?oauth_token=" + requestToken.getToken());
 
       return Response.seeOther(authenticationUrl).build();
-    }catch(Exception ex){
-      ex.printStackTrace();
+    } catch(Exception ex) {
+      logger.error("Error during performLogin", ex);
       return Response.serverError().build();
     }
   }
@@ -185,43 +176,77 @@ public class CleverCloudIdentityProvider extends AbstractIdentityProvider<Clever
 
       try {
         if (denied != null) {
-          return callback.error( this.provider.session.identityProviders().getById("clevercloud"),"Cancelled");
+          return callback.error(this.provider.session.identityProviders().getById("clevercloud"), "Cancelled");
         }
-        final OAuth10aService service = new ServiceBuilder(provider.getConfig().getConfig().get("clientId"))
-                .apiSecret(provider.getConfig().getConfig().get("clientSecret"))
-                .callback(redirect)
-                .build(CleverCloudApi.instance());
-        OAuth1RequestToken oAuth1RequestToken = new OAuth1RequestToken(cleverCloudToken, cleverCloudTokenSecret);
-        final OAuth1AccessToken accessToken = service.getAccessToken(oAuth1RequestToken, verifier);
+        
+        String oauthClientId = provider.getConfig().getConfig().get("clientId");
+        String oauthClientSecret = provider.getConfig().getConfig().get("clientSecret");
+        OAuth1Helper oauthHelper = new OAuth1Helper(oauthClientId, oauthClientSecret);
+        
+        RequestToken requestToken = new RequestToken(cleverCloudToken, cleverCloudTokenSecret);
+        final AccessToken accessToken = oauthHelper.getAccessToken(CleverCloudApi.ACCESS_TOKEN_URL, requestToken, verifier);
 
-        final OAuthRequest request2 = new OAuthRequest(Verb.GET, "https://api.clever-cloud.com/v2/self");
-        service.signRequest(accessToken, request2);
-        try (com.github.scribejava.core.model.Response response = service.execute(request2)) {
-          Map<String, String> mapping = new ObjectMapper().readValue(response.getBody(), HashMap.class);
-          BrokeredIdentityContext identity = new BrokeredIdentityContext(mapping.get("id"), provider.getConfig() );
-          //identity.setIdpConfig(provider.getConfig());
-          identity.setAuthenticationSession(authSession);
-          identity.setIdp(provider);
-          identity.setUsername(mapping.get("email"));
-          identity.setEmail(mapping.get("email"));
-          StringBuilder tokenBuilder = new StringBuilder();
-
-          tokenBuilder.append("{");
-          tokenBuilder.append("\"oauth_token\":").append("\"").append(cleverCloudToken).append("\"").append(",");
-          tokenBuilder.append("\"oauth_token_secret\":").append("\"").append(cleverCloudTokenSecret).append("\"").append(",");
-          tokenBuilder.append("\"user_id\":").append("\"").append(user).append("\"");
-          tokenBuilder.append("}");
-          String token = tokenBuilder.toString();
-          if (provider.getConfig().isStoreToken()) {
-            identity.setToken(token);
-          }
-          identity.getContextData().put(UserAuthenticationIdentityProvider.FEDERATED_ACCESS_TOKEN, token);
-
-          return callback.authenticated(identity);
+        String userInfoResponse = oauthHelper.executeSignedRequest(CleverCloudApi.USER_INFO_URL, accessToken);
+        
+        Map<String, Object> userInfo = new ObjectMapper().readValue(userInfoResponse, HashMap.class);
+        
+        // Extract user ID and create identity context
+        String userId = (String) userInfo.get("id");
+        BrokeredIdentityContext identity = new BrokeredIdentityContext(userId, provider.getConfig());
+        identity.setAuthenticationSession(authSession);
+        identity.setIdp(provider);
+        
+        // Map user attributes from Clever Cloud API
+        String email = (String) userInfo.get("email");
+        String name = (String) userInfo.get("name");
+        Boolean admin = (Boolean) userInfo.get("admin");
+        String preferredMFA = (String) userInfo.get("preferredMFA");
+        
+        identity.setEmail(email);
+        identity.setUsername(email); // Use email as username if no specific username field
+        
+        // Set name components if available
+        if (name != null && !name.isEmpty()) {
+            // Try to split name into first/last name
+            String[] nameParts = name.split("\\s+", 2);
+            if (nameParts.length > 0) {
+                identity.setFirstName(nameParts[0]);
+            }
+            if (nameParts.length > 1) {
+                identity.setLastName(nameParts[1]);
+            }
+            identity.setName(name);
         }
+        
+        // Store additional attributes
+        if (admin != null) {
+            identity.setUserAttribute("clevercloud.admin", String.valueOf(admin));
+        }
+        if (preferredMFA != null) {
+            identity.setUserAttribute("clevercloud.preferredMFA", preferredMFA);
+        }
+        
+        // Store raw user info for reference
+        identity.setUserAttribute("clevercloud.userId", userId);
+        
+        StringBuilder tokenBuilder = new StringBuilder();
+        tokenBuilder.append("{");
+        tokenBuilder.append("\"oauth_token\":").append("\"").append(accessToken.getToken()).append("\"").append(",");
+        tokenBuilder.append("\"oauth_token_secret\":").append("\"").append(accessToken.getTokenSecret()).append("\"").append(",");
+        tokenBuilder.append("\"user_id\":").append("\"").append(user).append("\"");
+        tokenBuilder.append("}");
+        String token = tokenBuilder.toString();
+        
+        // Store token if configured (default to false if not set)
+        Boolean storeToken = provider.getConfig().isStoreToken();
+        if (storeToken != null && storeToken) {
+          identity.setToken(token);
+        }
+        identity.getContextData().put(UserAuthenticationIdentityProvider.FEDERATED_ACCESS_TOKEN, token);
 
-      }catch(Exception ex){
-        ex.printStackTrace();
+        return callback.authenticated(identity);
+
+      } catch(Exception ex) {
         logger.error("Couldn't get user profile from Clever-cloud.", ex);
         sendErrorEvent();
         return ErrorPage.error(session, authSession, Response.Status.BAD_GATEWAY, Messages.UNEXPECTED_ERROR_HANDLING_RESPONSE);
