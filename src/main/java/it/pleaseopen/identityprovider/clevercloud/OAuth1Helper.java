@@ -96,18 +96,12 @@ public class OAuth1Helper {
         oauthParams.put("oauth_timestamp", String.valueOf(System.currentTimeMillis() / 1000));
         oauthParams.put("oauth_version", OAUTH_VERSION);
         
-        logger.infof("OAuth params before signature: %s", oauthParams);
         
         String signature = generateSignature("POST", requestTokenUrl, oauthParams, consumerSecret, "");
         oauthParams.put("oauth_signature", signature);
         
-        logger.infof("Generated signature: %s", signature);
-        
         String authHeader = buildAuthorizationHeader(oauthParams);
-        
-        logger.infof("Authorization header: %s", authHeader);
-        logger.infof("Request URL: %s", requestTokenUrl);
-        
+                
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(requestTokenUrl))
                 .header("Authorization", authHeader)
@@ -116,12 +110,8 @@ public class OAuth1Helper {
                 .header("Accept", "*/*")
                 .POST(HttpRequest.BodyPublishers.ofString(""))
                 .build();
-        
-        logger.infof("Request headers: %s", request.headers());
-        
+                
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        
-        logger.infof("Response status: %d, body: %s", response.statusCode(), response.body());
         
         if (response.statusCode() != 200) {
             throw new IOException("Failed to get request token: " + response.statusCode() + " - " + response.body());
@@ -207,12 +197,8 @@ public class OAuth1Helper {
             // Create the signature base string
             String baseString = buildSignatureBaseString(method, url, params);
             
-            logger.infof("Signature base string: %s", baseString);
-            
             // Create the signing key
             String signingKey = percentEncode(consumerSecret) + "&" + percentEncode(tokenSecret);
-            
-            logger.infof("Signing key: %s", signingKey);
             
             // Generate the signature
             Mac mac = Mac.getInstance("HmacSHA1");
