@@ -270,4 +270,10 @@ public class CleverCloudIdentityProvider extends AbstractIdentityProvider<Clever
     authSession.setUserSessionNote(UserAuthenticationIdentityProvider.FEDERATED_ACCESS_TOKEN, (String)context.getContextData().get(UserAuthenticationIdentityProvider.FEDERATED_ACCESS_TOKEN));
 
   }
+
+  @Override
+  public Response retrieveToken(KeycloakSession session, FederatedIdentityModel identity, UserSessionModel userSession,
+      UserModel user) {
+    return retrieveToken(session, identity);
+  }
 }
