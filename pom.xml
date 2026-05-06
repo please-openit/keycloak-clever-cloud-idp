@@ -6,13 +6,23 @@
 
 	<groupId>please-open.it</groupId>
 	<artifactId>clever-cloud-idp</artifactId>
-    <version>${keycloak.version}</version>
+    <version>${revision}</version>
+	
+    <properties>
+		
+		<maven.compiler.source>${java.version}</maven.compiler.source>
+		<maven.compiler.target>${java.version}</maven.compiler.target>
 
-	<parent>
-		<groupId>it.pleaseopen</groupId>
-		<artifactId>keycloak-spis</artifactId>
-		<version>rolling</version>
-	</parent>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <keycloak.version>${revision}</keycloak.version>
+
+        <maven-jar.plugin.version>3.5.0</maven-jar.plugin.version>
+        <!--junit.version>5.10.2</junit.version>
+        <mockito.version>5.14.2</mockito.version-->
+        
+    </properties>
 
 	<dependencies>
 		<dependency>
